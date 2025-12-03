@@ -582,15 +582,9 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
   loading: boolean;
   onClose: () => void;
 }) {
+  // Hooks must be called before any conditional returns
   const [sortBy, setSortBy] = useState<SortOption>("time-desc");
   
-  if (!date) return null;
-  const prettyDate = format(new Date(date), "MMMM d, yyyy");
-  const isLight = theme === "light";
-  const panelClass = isLight 
-    ? "flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white p-6 shadow-lg" 
-    : "flex h-full w-full max-w-md flex-col border-l border-slate-700/50 bg-slate-900/95 p-6 shadow-lg";
-
   // Sort items based on selected option
   const sortedItems = useMemo(() => {
     if (mode === "trades") {
@@ -623,6 +617,15 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
       });
     }
   }, [items, mode, sortBy]);
+
+  // Early return after hooks
+  if (!date) return null;
+  
+  const prettyDate = format(new Date(date), "MMMM d, yyyy");
+  const isLight = theme === "light";
+  const panelClass = isLight 
+    ? "flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white p-6 shadow-lg" 
+    : "flex h-full w-full max-w-md flex-col border-l border-slate-700/50 bg-slate-900/95 p-6 shadow-lg";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
