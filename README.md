@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# P&L Calendar
+
+A Next.js (App Router + TypeScript) web app for visualizing MetaTrader 5 (MT5) trading performance on a monthly heatmap calendar. Upload an MT5 statement (.xls or .xlsx) and review daily P&L, trade counts, and per-trade details in a dark theme UI.
+
+## Tech Stack
+- Next.js 16 (App Router, TypeScript)
+- Tailwind CSS v4 (via `@tailwindcss/postcss`)
+- Prisma ORM + SQLite
+- `xlsx` for parsing MT5 exports
 
 ## Getting Started
 
-First, run the development server:
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+2. **Environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+   Update `DATABASE_URL` if you prefer a different SQLite file path.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. **Database setup**
+   ```bash
+   npx prisma migrate dev
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+4. **Seed sample trades (optional)**
+   ```bash
+   npm run seed
+   ```
+   This wipes existing trades and inserts 45 dummy records so you can explore the calendar immediately.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+5. **(Optional) Backfill idea keys after schema updates**
+   ```bash
+   npm run backfill:ideas
+   ```
+   Populates `netPnl` and idea grouping keys for any existing trades (safe to run multiple times).
 
-## Learn More
+6. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
+   Visit [http://localhost:3000](http://localhost:3000) to view the calendar.
 
-To learn more about Next.js, take a look at the following resources:
+## Uploading MT5 Reports
+1. Export your MT5 history (Statement) as `.xls` or `.xlsx`.
+2. Open [http://localhost:3000/upload](http://localhost:3000/upload).
+3. Choose the file and click **Upload report**.
+4. The app parses trades, saves them via Prisma, and deduplicates by MT5 ticket.
+5. Return to the calendar (`/`) to see the imported data. Use the month/year controls and the **Trades ↔ Trade ideas** toggle to switch counting modes.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API Endpoints
+- `POST /api/upload` — accepts a `file` FormData field, parses MT5 data, inserts trades.
+- `GET /api/daily-pnl?from=YYYY-MM-DD&to=YYYY-MM-DD` — returns grouped daily net P&L (`profit + commission + swap`).
+- `GET /api/trades-by-day?date=YYYY-MM-DD` — lists individual trades (sorted by `closeTime`) with net P&L per trade.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Scripts
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start Next.js dev server |
+| `npm run build` | Production build |
+| `npm run start` | Serve built app |
+| `npm run lint` | Run ESLint |
+| `npm run seed` | Seed SQLite with dummy trades |
+| `npm run backfill:ideas` | Populate net P&L + idea keys for legacy rows |
+| `npx prisma migrate dev` | Create/apply migrations |
+| `npx prisma studio` | (Optional) Inspect DB via Prisma Studio |
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- The calendar groups trades by close date, displays net P&L with a red/green heatmap, and opens a detail panel with per-trade breakdowns on click.
+- Uploading the same MT5 file repeatedly is safe—trades are deduplicated by `ticket`.
+- No authentication is implemented in v1; everything runs against a single SQLite database.
+- Use the header toggle to switch between dark and light modes; your choice is remembered locally.
