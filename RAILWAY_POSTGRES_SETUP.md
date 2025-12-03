@@ -45,7 +45,7 @@ SQLite files on Railway are **ephemeral** - they get wiped when:
 
 Railway will automatically:
 1. Detect the new `DATABASE_URL`
-2. Run `prisma migrate deploy` during build
+2. Run `prisma migrate deploy` at startup
 3. Create tables in PostgreSQL
 4. Your data will now persist! 🎉
 
@@ -91,4 +91,5 @@ Railway will automatically:
 ✅ **Better performance** - For larger datasets  
 ✅ **Production-ready** - Industry standard  
 ✅ **Free tier available** - Railway provides free PostgreSQL
+
 
