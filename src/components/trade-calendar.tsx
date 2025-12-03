@@ -570,6 +570,8 @@ export function TradeCalendar() {
   );
 }
 
+type SortOption = "time-asc" | "time-desc" | "profit-asc" | "profit-desc";
+
 function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, onClose }: {
   date: string | null;
   stats: DailyPnl | null;
@@ -580,12 +582,47 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
   loading: boolean;
   onClose: () => void;
 }) {
+  const [sortBy, setSortBy] = useState<SortOption>("time-desc");
+  
   if (!date) return null;
   const prettyDate = format(new Date(date), "MMMM d, yyyy");
   const isLight = theme === "light";
   const panelClass = isLight 
     ? "flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white p-6 shadow-lg" 
     : "flex h-full w-full max-w-md flex-col border-l border-slate-700/50 bg-slate-900/95 p-6 shadow-lg";
+
+  // Sort items based on selected option
+  const sortedItems = useMemo(() => {
+    if (mode === "trades") {
+      const trades = items as TradeWithNet[];
+      return [...trades].sort((a, b) => {
+        if (sortBy === "time-asc") {
+          // Sort by openTime for trades (oldest first)
+          return new Date(a.openTime).getTime() - new Date(b.openTime).getTime();
+        } else if (sortBy === "time-desc") {
+          // Sort by openTime for trades (newest first)
+          return new Date(b.openTime).getTime() - new Date(a.openTime).getTime();
+        } else if (sortBy === "profit-asc") {
+          return a.netPnl - b.netPnl;
+        } else { // profit-desc
+          return b.netPnl - a.netPnl;
+        }
+      });
+    } else {
+      const ideas = items as TradeIdeaSummary[];
+      return [...ideas].sort((a, b) => {
+        if (sortBy === "time-asc") {
+          return new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime();
+        } else if (sortBy === "time-desc") {
+          return new Date(b.closeTime).getTime() - new Date(a.closeTime).getTime();
+        } else if (sortBy === "profit-asc") {
+          return a.netPnl - b.netPnl;
+        } else { // profit-desc
+          return b.netPnl - a.netPnl;
+        }
+      });
+    }
+  }, [items, mode, sortBy]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -607,10 +644,35 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
             ×
           </button>
         </div>
+        
+        {/* Sort Controls */}
+        {!loading && items.length > 0 && (
+          <div className="mb-4">
+            <label className={clsx("block text-xs font-medium mb-2", isLight ? "text-slate-600" : "text-slate-300")}>
+              Sort by
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className={clsx(
+                "w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 transition",
+                isLight
+                  ? "border-slate-300 bg-white text-slate-700 focus:ring-slate-400 focus:border-slate-400"
+                  : "border-slate-600/80 bg-slate-800/70 text-slate-100 focus:border-cyan-400 focus:ring-cyan-400/50"
+              )}
+            >
+              <option value="time-desc">⏰ Time (New → Old)</option>
+              <option value="time-asc">⏰ Time (Old → New)</option>
+              <option value="profit-desc">💰 Profit (High → Low)</option>
+              <option value="profit-asc">💰 Profit (Low → High)</option>
+            </select>
+          </div>
+        )}
+        
         <div className="flex-1 overflow-y-auto pr-2">
           {loading && <p className={clsx("text-sm", isLight ? "text-slate-500" : "text-slate-400")}>Loading trades…</p>}
           {!loading && items.length === 0 && <p className={clsx("text-sm", isLight ? "text-slate-500" : "text-slate-500")}>No {unitLabel} for this day.</p>}
-          {mode === "ideas" ? <IdeaList ideas={items as TradeIdeaSummary[]} isLight={isLight} /> : <TradeList trades={items as TradeWithNet[]} isLight={isLight} />}
+          {mode === "ideas" ? <IdeaList ideas={sortedItems as TradeIdeaSummary[]} isLight={isLight} /> : <TradeList trades={sortedItems as TradeWithNet[]} isLight={isLight} />}
         </div>
       </aside>
     </div>
