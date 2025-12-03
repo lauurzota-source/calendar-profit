@@ -300,33 +300,33 @@ export function TradeCalendar() {
   const unitLabel = viewMode === "ideas" ? "ideas" : "trades";
   const showTradeInfo = showTrades || showTradeIdeas;
   const surfaceHeader = isLight 
-    ? "rounded-lg border border-slate-200 bg-white p-4 md:p-6 shadow-sm" 
-    : "rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 md:p-6 shadow-sm";
+    ? "rounded-lg border border-slate-200 bg-white p-6 shadow-sm" 
+    : "rounded-lg border border-slate-700/50 bg-slate-900/50 p-6 shadow-sm";
   const calendarSurface = isLight 
-    ? "rounded-lg border border-slate-200 bg-white p-3 md:p-6 shadow-sm" 
-    : "rounded-lg border border-slate-700/50 bg-slate-900/50 p-3 md:p-6 shadow-sm";
+    ? "rounded-lg border border-slate-200 bg-white p-6 shadow-sm" 
+    : "rounded-lg border border-slate-700/50 bg-slate-900/50 p-6 shadow-sm";
   const manageSurface = isLight 
-    ? "rounded-lg border border-slate-200 bg-slate-50 p-3 md:p-4 text-sm" 
-    : "rounded-lg border border-slate-700/50 bg-slate-800/30 p-3 md:p-4 text-sm";
+    ? "rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm" 
+    : "rounded-lg border border-slate-700/50 bg-slate-800/30 p-4 text-sm";
 
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6 px-2 md:px-0">
+    <div className="flex flex-col gap-6 px-2 md:px-0">
       <header className={surfaceHeader}>
-        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-4 md:gap-6">
-          <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-6">
+          <div className="flex items-center gap-4">
             <div>
               <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>P&L Calendar</p>
-              <h1 className={clsx("text-xl md:text-2xl font-semibold", isLight ? "text-slate-900" : "text-white")}>{format(cursor, "MMMM yyyy")}</h1>
+              <h1 className={clsx("text-2xl font-semibold", isLight ? "text-slate-900" : "text-white")}>{format(cursor, "MMMM yyyy")}</h1>
             </div>
             <div 
-              className="flex items-center gap-1 border-l pl-2 md:pl-4" 
+              className="flex items-center gap-1 border-l pl-4" 
               style={isLight ? { borderColor: "#e2e8f0" } : { borderColor: "#475569" }}
             >
               <button
                 className={clsx(
-                  "rounded border bg-transparent p-1.5 md:p-2 transition text-sm md:text-base",
+                  "rounded border bg-transparent p-2 transition text-base",
                   isLight 
                     ? "border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50" 
                     : "border-slate-600/80 text-slate-200 hover:border-cyan-400 hover:text-cyan-300"
@@ -338,7 +338,7 @@ export function TradeCalendar() {
               </button>
               <button
                 className={clsx(
-                  "rounded border bg-transparent p-1.5 md:p-2 transition text-sm md:text-base",
+                  "rounded border bg-transparent p-2 transition text-base",
                   isLight 
                     ? "border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50" 
                     : "border-slate-600/80 text-slate-200 hover:border-cyan-400 hover:text-cyan-300"
@@ -355,7 +355,7 @@ export function TradeCalendar() {
                   setCursor(new Date(nextYear, month, 1));
                 }}
                 className={clsx(
-                  "rounded border px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm focus:outline-none focus:ring-2 transition",
+                  "rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 transition",
                   isLight 
                     ? "border-slate-300 bg-white text-slate-700 focus:ring-slate-400 focus:border-slate-400" 
                     : "border-slate-600/80 bg-slate-900/70 text-slate-100 focus:border-cyan-400"
@@ -369,15 +369,15 @@ export function TradeCalendar() {
               </select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 md:gap-4">
-            <div className={clsx("px-3 md:px-5 py-2 md:py-3", isLight ? "bg-slate-50 border border-slate-200 rounded-lg" : "rounded-lg border border-slate-700/50 bg-slate-800/50")}>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className={clsx("px-5 py-3", isLight ? "bg-slate-50 border border-slate-200 rounded-lg" : "rounded-lg border border-slate-700/50 bg-slate-800/50")}>
               <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>Month P&L</p>
-              <p className={clsx("font-mono text-lg md:text-2xl font-semibold", monthTotal >= 0 ? (isLight ? "text-emerald-600" : "text-emerald-400") : (isLight ? "text-rose-600" : "text-rose-400"))}>{formatCurrency(monthTotal)}</p>
+              <p className={clsx("font-mono text-2xl font-semibold", monthTotal >= 0 ? (isLight ? "text-emerald-600" : "text-emerald-400") : (isLight ? "text-rose-600" : "text-rose-400"))}>{formatCurrency(monthTotal)}</p>
             </div>
             <div className="relative" ref={menuRef}>
               <button
                 className={clsx(
-                  "border px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition",
+                  "border px-4 py-2 text-sm font-medium transition",
                   isLight
                     ? "rounded border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400"
                     : "rounded border-slate-600/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600"
@@ -390,7 +390,7 @@ export function TradeCalendar() {
               {menuOpen && (
                 <div
                   className={clsx(
-                    "absolute right-0 md:right-0 left-0 md:left-auto mt-2 w-full md:w-64 border p-4 z-50 shadow-lg",
+                    "absolute right-0 mt-2 w-full md:w-64 border p-4 z-50 shadow-lg",
                     isLight
                       ? "rounded-lg border-slate-200 bg-white"
                       : "rounded-lg border-slate-700/50 bg-slate-900/90"
@@ -429,7 +429,7 @@ export function TradeCalendar() {
       <section className={calendarSurface}>
         <div
           className={clsx(
-            "grid gap-2 md:gap-3 text-center text-xs font-medium uppercase tracking-wider",
+            "grid gap-3 text-center text-xs font-medium uppercase tracking-wider",
             isLight ? "text-slate-600" : "text-slate-400"
           )}
           style={{ gridTemplateColumns: showWeekends ? "repeat(7, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))" }}
@@ -451,8 +451,8 @@ export function TradeCalendar() {
             return (
               <div
                 key={`${week[0].toISOString()}-${index}`}
-                className="grid gap-2 md:gap-3"
-                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 60px md:80px` }}
+                className="grid gap-3"
+                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 80px` }}
               >
                 {week.map((date) => {
                     const key = formatISO(date);
@@ -624,8 +624,8 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
   const prettyDate = format(new Date(date), "MMMM d, yyyy");
   const isLight = theme === "light";
   const panelClass = isLight 
-    ? "flex h-full w-full md:max-w-md flex-col md:border-l border-t md:border-t-0 border-slate-200 bg-white p-4 md:p-6 shadow-lg" 
-    : "flex h-full w-full md:max-w-md flex-col md:border-l border-t md:border-t-0 border-slate-700/50 bg-slate-900/95 p-4 md:p-6 shadow-lg";
+    ? "flex h-full w-full md:max-w-lg flex-col md:border-l border-t md:border-t-0 border-slate-200 bg-white p-4 md:p-6 shadow-lg" 
+    : "flex h-full w-full md:max-w-lg flex-col md:border-l border-t md:border-t-0 border-slate-700/50 bg-slate-900/95 p-4 md:p-6 shadow-lg";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
