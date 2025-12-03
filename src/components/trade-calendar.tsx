@@ -429,7 +429,7 @@ export function TradeCalendar() {
       <section className={calendarSurface}>
         <div
           className={clsx(
-            "grid gap-3 text-center text-xs font-medium uppercase tracking-wider",
+            "grid gap-2 md:gap-3 text-center text-xs font-medium uppercase tracking-wider",
             isLight ? "text-slate-600" : "text-slate-400"
           )}
           style={{ gridTemplateColumns: showWeekends ? "repeat(7, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))" }}
@@ -451,8 +451,8 @@ export function TradeCalendar() {
             return (
               <div
                 key={`${week[0].toISOString()}-${index}`}
-                className="grid gap-3"
-                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 80px` }}
+                className="grid gap-2 md:gap-3"
+                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 60px md:80px` }}
               >
                 {week.map((date) => {
                     const key = formatISO(date);
@@ -487,7 +487,7 @@ export function TradeCalendar() {
                     <button
                         key={key}
                         className={clsx(
-                          "flex flex-col px-1.5 md:px-3 py-1.5 md:py-3 text-left transition border shadow-sm hover:shadow",
+                          "flex flex-col px-1.5 md:px-4 py-1.5 md:py-4 text-left transition border shadow-sm hover:shadow",
                           isLight ? "rounded" : "rounded-lg",
                           color,
                           isCurrentMonth ? "opacity-100" : "opacity-40",
@@ -496,8 +496,8 @@ export function TradeCalendar() {
                         onClick={() => handleSelectDay(date)}
                         disabled={!isCurrentMonth || isFuture || (!showTrades && !showTradeIdeas)}
                       >
-                        <span className={clsx("text-xs font-medium mb-0.5 md:mb-1", isLight ? "text-slate-500" : "text-slate-400")}>{date.getDate()}</span>
-                        <span className={clsx("text-xs md:text-sm font-semibold mb-0.5", isLight ? "text-slate-900" : "text-white")}>{formatCurrency(value)}</span>
+                        <span className={clsx("text-xs md:text-sm font-medium mb-0.5 md:mb-1", isLight ? "text-slate-500" : "text-slate-400")}>{date.getDate()}</span>
+                        <span className={clsx("text-xs md:text-base font-semibold mb-0.5", isLight ? "text-slate-900" : "text-white")}>{formatCurrency(value)}</span>
                         {showTradeInfo && (
                           <span className={clsx("text-[10px] md:text-xs", isLight ? "text-slate-500" : "text-slate-300")}>
                             {isFuture ? `0 ${unitLabel}` : effectiveStats ? `${count} ${unitLabel}` : `No ${unitLabel}`}
