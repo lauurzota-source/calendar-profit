@@ -444,7 +444,7 @@ export function TradeCalendar() {
           className={clsx(
             "grid text-center text-xs font-medium uppercase tracking-wider",
             isLight ? "text-slate-600" : "text-slate-400",
-            calendarView === "gallery" ? "gap-2 md:gap-3" : "gap-3 md:gap-4"
+            calendarView === "gallery" ? "gap-2 md:gap-2.5" : "gap-3 md:gap-4"
           )}
           style={{ gridTemplateColumns: showWeekends ? "repeat(7, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))" }}
         >
@@ -467,9 +467,9 @@ export function TradeCalendar() {
                 key={`${week[0].toISOString()}-${index}`}
                 className={clsx(
                   "grid",
-                  calendarView === "gallery" ? "gap-2 md:gap-3" : "gap-3 md:gap-4"
+                  calendarView === "gallery" ? "gap-2 md:gap-2.5" : "gap-3 md:gap-4"
                 )}
-                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) ${calendarView === "gallery" ? "60px md:80px" : "80px md:100px"}` }}
+                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) ${calendarView === "gallery" ? "60px md:70px" : "80px md:100px"}` }}
               >
                 {week.map((date) => {
                     const key = formatISO(date);
@@ -510,7 +510,7 @@ export function TradeCalendar() {
                           isCurrentMonth ? "opacity-100" : "opacity-40",
                           isSelected && (isLight ? "ring-2 ring-slate-400" : "ring-2 ring-slate-500"),
                           calendarView === "gallery" 
-                            ? "px-1.5 md:px-3 py-1.5 md:py-3" 
+                            ? "px-2 md:px-3 py-2 md:py-3" 
                             : "px-3 md:px-6 py-3 md:py-6"
                         )}
                         onClick={() => handleSelectDay(date)}
@@ -527,7 +527,7 @@ export function TradeCalendar() {
                           "font-semibold",
                           isLight ? "text-slate-900" : "text-white",
                           calendarView === "gallery"
-                            ? "text-xs md:text-base mb-0.5"
+                            ? "text-xs md:text-sm mb-0.5"
                             : "text-base md:text-lg mb-1"
                         )}>{formatCurrency(value)}</span>
                         {showTradeInfo && (
