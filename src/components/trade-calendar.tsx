@@ -27,6 +27,7 @@ export function TradeCalendar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [showWeekends, setShowWeekends] = useState(true);
   const [liveUpdates, setLiveUpdates] = useState(true);
+  const [calendarView, setCalendarView] = useState<"gallery" | "inline">("gallery");
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [detailItems, setDetailItems] = useState<(TradeWithNet | TradeIdeaSummary)[]>([]);
@@ -142,6 +143,10 @@ export function TradeCalendar() {
       // Default: both false (hide all)
       setShowTradeIdeas(false);
     }
+    const storedCalendarView = window.localStorage.getItem("pnl-calendar-view");
+    if (storedCalendarView === "gallery" || storedCalendarView === "inline") {
+      setCalendarView(storedCalendarView);
+    }
   }, []);
 
   useEffect(() => {
@@ -183,6 +188,12 @@ export function TradeCalendar() {
       window.localStorage.setItem("pnl-show-trade-ideas", String(showTradeIdeas));
     }
   }, [showTradeIdeas]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pnl-calendar-view", calendarView);
+    }
+  }, [calendarView]);
 
   // Live updates polling - refresh every 5 seconds when enabled and tab is visible
   useEffect(() => {
@@ -405,6 +416,8 @@ export function TradeCalendar() {
                     onDateModeChange={setDateMode}
                     liveUpdates={liveUpdates}
                     onLiveUpdatesChange={setLiveUpdates}
+                    calendarView={calendarView}
+                    onCalendarViewChange={setCalendarView}
                     onJumpToToday={() => {
                       setCursor(startOfMonth(new Date()));
                       setMenuOpen(false);
@@ -429,8 +442,9 @@ export function TradeCalendar() {
       <section className={calendarSurface}>
         <div
           className={clsx(
-            "grid gap-2 md:gap-3 text-center text-xs font-medium uppercase tracking-wider",
-            isLight ? "text-slate-600" : "text-slate-400"
+            "grid text-center text-xs font-medium uppercase tracking-wider",
+            isLight ? "text-slate-600" : "text-slate-400",
+            calendarView === "gallery" ? "gap-2 md:gap-3" : "gap-3 md:gap-4"
           )}
           style={{ gridTemplateColumns: showWeekends ? "repeat(7, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))" }}
         >
@@ -451,8 +465,11 @@ export function TradeCalendar() {
             return (
               <div
                 key={`${week[0].toISOString()}-${index}`}
-                className="grid gap-2 md:gap-3"
-                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 60px md:80px` }}
+                className={clsx(
+                  "grid",
+                  calendarView === "gallery" ? "gap-2 md:gap-3" : "gap-3 md:gap-4"
+                )}
+                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) ${calendarView === "gallery" ? "60px md:80px" : "80px md:100px"}` }}
               >
                 {week.map((date) => {
                     const key = formatISO(date);
@@ -487,19 +504,39 @@ export function TradeCalendar() {
                     <button
                         key={key}
                         className={clsx(
-                          "flex flex-col px-1.5 md:px-4 py-1.5 md:py-4 text-left transition border shadow-sm hover:shadow",
+                          "flex flex-col text-left transition border shadow-sm hover:shadow",
                           isLight ? "rounded" : "rounded-lg",
                           color,
                           isCurrentMonth ? "opacity-100" : "opacity-40",
-                          isSelected && (isLight ? "ring-2 ring-slate-400" : "ring-2 ring-slate-500")
+                          isSelected && (isLight ? "ring-2 ring-slate-400" : "ring-2 ring-slate-500"),
+                          calendarView === "gallery" 
+                            ? "px-1.5 md:px-3 py-1.5 md:py-3" 
+                            : "px-3 md:px-6 py-3 md:py-6"
                         )}
                         onClick={() => handleSelectDay(date)}
                         disabled={!isCurrentMonth || isFuture || (!showTrades && !showTradeIdeas)}
                       >
-                        <span className={clsx("text-xs md:text-sm font-medium mb-0.5 md:mb-1", isLight ? "text-slate-500" : "text-slate-400")}>{date.getDate()}</span>
-                        <span className={clsx("text-xs md:text-base font-semibold mb-0.5", isLight ? "text-slate-900" : "text-white")}>{formatCurrency(value)}</span>
+                        <span className={clsx(
+                          "font-medium",
+                          isLight ? "text-slate-500" : "text-slate-400",
+                          calendarView === "gallery"
+                            ? "text-xs md:text-sm mb-0.5 md:mb-1"
+                            : "text-sm md:text-base mb-1 md:mb-2"
+                        )}>{date.getDate()}</span>
+                        <span className={clsx(
+                          "font-semibold",
+                          isLight ? "text-slate-900" : "text-white",
+                          calendarView === "gallery"
+                            ? "text-xs md:text-base mb-0.5"
+                            : "text-base md:text-lg mb-1"
+                        )}>{formatCurrency(value)}</span>
                         {showTradeInfo && (
-                          <span className={clsx("text-[10px] md:text-xs", isLight ? "text-slate-500" : "text-slate-300")}>
+                          <span className={clsx(
+                            isLight ? "text-slate-500" : "text-slate-300",
+                            calendarView === "gallery"
+                              ? "text-[10px] md:text-xs"
+                              : "text-xs md:text-sm"
+                          )}>
                             {isFuture ? `0 ${unitLabel}` : effectiveStats ? `${count} ${unitLabel}` : `No ${unitLabel}`}
                           </span>
                         )}
@@ -819,6 +856,8 @@ function OptionsMenu({
   onDateModeChange,
   liveUpdates,
   onLiveUpdatesChange,
+  calendarView,
+  onCalendarViewChange,
   onJumpToToday,
   showWeekends,
   onShowWeekendsChange,
@@ -834,6 +873,8 @@ function OptionsMenu({
   onDateModeChange: (mode: DateMode) => void;
   liveUpdates: boolean;
   onLiveUpdatesChange: (enabled: boolean) => void;
+  calendarView: "gallery" | "inline";
+  onCalendarViewChange: (view: "gallery" | "inline") => void;
   onJumpToToday: () => void;
   showWeekends: boolean;
   onShowWeekendsChange: (show: boolean) => void;
@@ -921,6 +962,31 @@ function OptionsMenu({
               className="h-4 w-4 cursor-pointer"
             />
           </label>
+          <div className="space-y-2 pt-2">
+            <p className={clsx("text-xs font-medium", isLight ? "text-slate-600" : "text-slate-400")}>Layout</p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="calendarView"
+                value="gallery"
+                checked={calendarView === "gallery"}
+                onChange={() => onCalendarViewChange("gallery")}
+                className="h-4 w-4 cursor-pointer"
+              />
+              <span className={clsx("text-sm", isLight ? "text-slate-700" : "text-slate-200")}>🖼️ Gallery (compact)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="calendarView"
+                value="inline"
+                checked={calendarView === "inline"}
+                onChange={() => onCalendarViewChange("inline")}
+                className="h-4 w-4 cursor-pointer"
+              />
+              <span className={clsx("text-sm", isLight ? "text-slate-700" : "text-slate-200")}>📋 Inline (spacious)</span>
+            </label>
+          </div>
         </div>
       </div>
 
