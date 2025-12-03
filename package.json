@@ -14,6 +14,7 @@
     "seed": "tsx prisma/seed.ts",
     "backfill:ideas": "tsx scripts/backfill-idea-groups.ts",
     "mt5:watch": "tsx scripts/mt5-watcher.ts",
+    "mt5:setup": "bash scripts/setup-mt5-folder.sh",
     "postinstall": "prisma generate"
   },
   "dependencies": {

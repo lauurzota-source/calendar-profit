@@ -16,12 +16,20 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 
 // Configuration
+// Set custom folder via environment variable: MT5_REPORTS_PATH
+// Or it will use default: ~/Documents/MT5-Reports
+const DEFAULT_REPORTS_FOLDER = `${process.env.HOME}/Documents/MT5-Reports`;
+const CUSTOM_REPORTS_PATH = process.env.MT5_REPORTS_PATH;
+
 const MT5_EXPORT_PATHS = [
-  // Common MT5 export locations on Mac
+  // Custom folder (highest priority)
+  CUSTOM_REPORTS_PATH,
+  // Default custom folder in Documents
+  DEFAULT_REPORTS_FOLDER,
+  // Common MT5 export locations on Mac (fallback)
   `${process.env.HOME}/Documents/MetaTrader 5/Reports`,
   `${process.env.HOME}/Library/Application Support/MetaQuotes/Terminal/*/MQL5/Files`,
-  // Add your custom path here
-];
+].filter(Boolean) as string[];
 
 const API_URL = process.env.MT5_API_URL || 'https://your-app-name.up.railway.app/api/upload';
 const WATCH_DELAY = 2000; // Wait 2 seconds after file appears before uploading
@@ -29,13 +37,40 @@ const WATCH_DELAY = 2000; // Wait 2 seconds after file appears before uploading
 const processedFiles = new Set<string>();
 
 function findMT5ReportsFolder(): string | null {
+  // First, try to find existing folder
   for (const path of MT5_EXPORT_PATHS) {
+    if (!path) continue;
     // Handle wildcards
     const expandedPath = path.replace('*', '');
     if (existsSync(expandedPath)) {
       return expandedPath;
     }
   }
+  
+  // If custom path is set but doesn't exist, create it
+  if (CUSTOM_REPORTS_PATH && !existsSync(CUSTOM_REPORTS_PATH)) {
+    const { mkdirSync } = require('fs');
+    try {
+      mkdirSync(CUSTOM_REPORTS_PATH, { recursive: true });
+      console.log(`📁 Created folder: ${CUSTOM_REPORTS_PATH}`);
+      return CUSTOM_REPORTS_PATH;
+    } catch (error) {
+      console.error(`❌ Failed to create folder: ${CUSTOM_REPORTS_PATH}`, error);
+    }
+  }
+  
+  // If default folder doesn't exist, create it
+  if (!existsSync(DEFAULT_REPORTS_FOLDER)) {
+    const { mkdirSync } = require('fs');
+    try {
+      mkdirSync(DEFAULT_REPORTS_FOLDER, { recursive: true });
+      console.log(`📁 Created default folder: ${DEFAULT_REPORTS_FOLDER}`);
+      return DEFAULT_REPORTS_FOLDER;
+    } catch (error) {
+      console.error(`❌ Failed to create default folder: ${DEFAULT_REPORTS_FOLDER}`, error);
+    }
+  }
+  
   return null;
 }
 
@@ -104,13 +139,19 @@ function startWatching(watchPath: string): void {
 const reportsPath = findMT5ReportsFolder();
 
 if (!reportsPath) {
-  console.error('❌ Could not find MT5 Reports folder.');
-  console.log('\nPlease set MT5_REPORTS_PATH environment variable:');
-  console.log('  export MT5_REPORTS_PATH="/path/to/your/mt5/reports"');
-  console.log('\nOr modify MT5_EXPORT_PATHS in this script.');
+  console.error('❌ Could not find or create MT5 Reports folder.');
+  console.log('\nOptions:');
+  console.log('1. Set custom folder via environment variable:');
+  console.log('   export MT5_REPORTS_PATH="/path/to/your/custom/folder"');
+  console.log('\n2. Default folder will be created at:');
+  console.log(`   ${DEFAULT_REPORTS_FOLDER}`);
+  console.log('\n3. Configure MT5 to export reports to this folder:');
+  console.log('   Tools → Options → Expert Advisors → Data Folder');
   process.exit(1);
 }
 
+console.log(`📂 Using reports folder: ${reportsPath}`);
+console.log(`💡 Tip: Configure MT5 to export reports to this folder`);
 startWatching(reportsPath);
 
 // Keep process alive

@@ -2,13 +2,33 @@
 
 ## Recommended: File Watcher Method (Easiest)
 
-### Step 1: Find Your MT5 Reports Folder
+### Step 1: Set Up Custom Reports Folder
 
+**Option A: Use Setup Script (Easiest)**
+```bash
+cd /Users/failioads/calendar-profit/pnl-calendar
+npm run mt5:setup
+```
+This will create a custom folder (default: `~/Documents/MT5-Reports`) and configure it.
+
+**Option B: Manual Setup**
+```bash
+# Create custom folder
+mkdir -p ~/Documents/MT5-Reports
+
+# Set environment variable
+export MT5_REPORTS_PATH="$HOME/Documents/MT5-Reports"
+
+# Add to your shell profile (permanent)
+echo 'export MT5_REPORTS_PATH="$HOME/Documents/MT5-Reports"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Then configure MT5:**
 1. Open MT5
 2. Go to **Tools → Options → Expert Advisors**
-3. Enable "Allow automated trading"
-4. Export a report: **View → Account History → Right click → Save as Report**
-5. Note the folder where it saves (usually: `~/Documents/MetaTrader 5/Reports`)
+3. Set "Data Folder" to your custom folder (e.g., `~/Documents/MT5-Reports`)
+4. Or manually export reports to this folder
 
 ### Step 2: Install Dependencies
 
