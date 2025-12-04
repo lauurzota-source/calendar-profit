@@ -27,7 +27,6 @@ export function TradeCalendar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [showWeekends, setShowWeekends] = useState(true);
   const [liveUpdates, setLiveUpdates] = useState(true);
-  const [calendarView, setCalendarView] = useState<"gallery" | "inline">("gallery");
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [detailItems, setDetailItems] = useState<(TradeWithNet | TradeIdeaSummary)[]>([]);
@@ -143,10 +142,6 @@ export function TradeCalendar() {
       // Default: both false (hide all)
       setShowTradeIdeas(false);
     }
-    const storedCalendarView = window.localStorage.getItem("pnl-calendar-view");
-    if (storedCalendarView === "gallery" || storedCalendarView === "inline") {
-      setCalendarView(storedCalendarView);
-    }
   }, []);
 
   useEffect(() => {
@@ -188,12 +183,6 @@ export function TradeCalendar() {
       window.localStorage.setItem("pnl-show-trade-ideas", String(showTradeIdeas));
     }
   }, [showTradeIdeas]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("pnl-calendar-view", calendarView);
-    }
-  }, [calendarView]);
 
   // Live updates polling - refresh every 5 seconds when enabled and tab is visible
   useEffect(() => {
@@ -323,9 +312,9 @@ export function TradeCalendar() {
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
   return (
-    <div className="flex flex-col gap-6 px-2 md:px-0">
+    <div className="flex flex-col gap-6">
       <header className={surfaceHeader}>
-        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div>
               <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>P&L Calendar</p>
@@ -337,7 +326,7 @@ export function TradeCalendar() {
             >
               <button
                 className={clsx(
-                  "rounded border bg-transparent p-2 transition text-base",
+                  "rounded border bg-transparent p-2 transition",
                   isLight 
                     ? "border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50" 
                     : "border-slate-600/80 text-slate-200 hover:border-cyan-400 hover:text-cyan-300"
@@ -349,7 +338,7 @@ export function TradeCalendar() {
               </button>
               <button
                 className={clsx(
-                  "rounded border bg-transparent p-2 transition text-base",
+                  "rounded border bg-transparent p-2 transition",
                   isLight 
                     ? "border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50" 
                     : "border-slate-600/80 text-slate-200 hover:border-cyan-400 hover:text-cyan-300"
@@ -401,7 +390,7 @@ export function TradeCalendar() {
               {menuOpen && (
                 <div
                   className={clsx(
-                    "absolute right-0 mt-2 w-full md:w-64 border p-4 z-50 shadow-lg",
+                    "absolute right-0 mt-2 w-64 border p-4 z-50 shadow-lg",
                     isLight
                       ? "rounded-lg border-slate-200 bg-white"
                       : "rounded-lg border-slate-700/50 bg-slate-900/90"
@@ -416,8 +405,6 @@ export function TradeCalendar() {
                     onDateModeChange={setDateMode}
                     liveUpdates={liveUpdates}
                     onLiveUpdatesChange={setLiveUpdates}
-                    calendarView={calendarView}
-                    onCalendarViewChange={setCalendarView}
                     onJumpToToday={() => {
                       setCursor(startOfMonth(new Date()));
                       setMenuOpen(false);
@@ -442,9 +429,8 @@ export function TradeCalendar() {
       <section className={calendarSurface}>
         <div
           className={clsx(
-            "grid text-center text-xs font-medium uppercase tracking-wider",
-            isLight ? "text-slate-600" : "text-slate-400",
-            calendarView === "gallery" ? "gap-2 md:gap-2.5" : "gap-3 md:gap-4"
+            "grid gap-3 text-center text-xs font-medium uppercase tracking-wider",
+            isLight ? "text-slate-600" : "text-slate-400"
           )}
           style={{ gridTemplateColumns: showWeekends ? "repeat(7, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))" }}
         >
@@ -465,11 +451,8 @@ export function TradeCalendar() {
             return (
               <div
                 key={`${week[0].toISOString()}-${index}`}
-                className={clsx(
-                  "grid",
-                  calendarView === "gallery" ? "gap-2 md:gap-2.5" : "gap-3 md:gap-4"
-                )}
-                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) ${calendarView === "gallery" ? "60px md:70px" : "80px md:100px"}` }}
+                className="grid gap-3"
+                style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr)) 80px` }}
               >
                 {week.map((date) => {
                     const key = formatISO(date);
@@ -504,39 +487,19 @@ export function TradeCalendar() {
                     <button
                         key={key}
                         className={clsx(
-                          "flex flex-col text-left transition border shadow-sm hover:shadow",
+                          "flex flex-col px-3 py-3 text-left transition border shadow-sm hover:shadow",
                           isLight ? "rounded" : "rounded-lg",
                           color,
                           isCurrentMonth ? "opacity-100" : "opacity-40",
-                          isSelected && (isLight ? "ring-2 ring-slate-400" : "ring-2 ring-slate-500"),
-                          calendarView === "gallery" 
-                            ? "px-2 md:px-3 py-2 md:py-3" 
-                            : "px-3 md:px-6 py-3 md:py-6"
+                          isSelected && (isLight ? "ring-2 ring-slate-400" : "ring-2 ring-slate-500")
                         )}
                         onClick={() => handleSelectDay(date)}
                         disabled={!isCurrentMonth || isFuture || (!showTrades && !showTradeIdeas)}
                       >
-                        <span className={clsx(
-                          "font-medium",
-                          isLight ? "text-slate-500" : "text-slate-400",
-                          calendarView === "gallery"
-                            ? "text-xs md:text-sm mb-0.5 md:mb-1"
-                            : "text-sm md:text-base mb-1 md:mb-2"
-                        )}>{date.getDate()}</span>
-                        <span className={clsx(
-                          "font-semibold",
-                          isLight ? "text-slate-900" : "text-white",
-                          calendarView === "gallery"
-                            ? "text-xs md:text-sm mb-0.5"
-                            : "text-base md:text-lg mb-1"
-                        )}>{formatCurrency(value)}</span>
+                        <span className={clsx("text-xs font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>{date.getDate()}</span>
+                        <span className={clsx("text-sm font-semibold mb-0.5", isLight ? "text-slate-900" : "text-white")}>{formatCurrency(value)}</span>
                         {showTradeInfo && (
-                          <span className={clsx(
-                            isLight ? "text-slate-500" : "text-slate-300",
-                            calendarView === "gallery"
-                              ? "text-[10px] md:text-xs"
-                              : "text-xs md:text-sm"
-                          )}>
+                          <span className={clsx("text-xs", isLight ? "text-slate-500" : "text-slate-300")}>
                             {isFuture ? `0 ${unitLabel}` : effectiveStats ? `${count} ${unitLabel}` : `No ${unitLabel}`}
                           </span>
                         )}
@@ -661,16 +624,16 @@ function DayDetailPanel({ date, stats, items, mode, unitLabel, loading, theme, o
   const prettyDate = format(new Date(date), "MMMM d, yyyy");
   const isLight = theme === "light";
   const panelClass = isLight 
-    ? "flex h-full w-full md:max-w-lg flex-col md:border-l border-t md:border-t-0 border-slate-200 bg-white p-4 md:p-6 shadow-lg" 
-    : "flex h-full w-full md:max-w-lg flex-col md:border-l border-t md:border-t-0 border-slate-700/50 bg-slate-900/95 p-4 md:p-6 shadow-lg";
+    ? "flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white p-6 shadow-lg" 
+    : "flex h-full w-full max-w-md flex-col border-l border-slate-700/50 bg-slate-900/95 p-6 shadow-lg";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <aside className={panelClass} onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4 md:mb-6">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>{prettyDate}</p>
-            <p className={clsx("text-xl md:text-2xl font-semibold mb-1", (stats?.dailyPnl ?? 0) >= 0 ? (isLight ? "text-emerald-600" : "text-emerald-400") : (isLight ? "text-rose-600" : "text-rose-400"))}>{stats ? formatCurrency(stats.dailyPnl) : "No P&L"}</p>
+            <p className={clsx("text-2xl font-semibold mb-1", (stats?.dailyPnl ?? 0) >= 0 ? (isLight ? "text-emerald-600" : "text-emerald-400") : (isLight ? "text-rose-600" : "text-rose-400"))}>{stats ? formatCurrency(stats.dailyPnl) : "No P&L"}</p>
             <p className={clsx("text-xs", isLight ? "text-slate-500" : "text-slate-500")}>{stats ? `${stats.itemCount} ${unitLabel}` : `0 ${unitLabel}`}</p>
           </div>
           <button 
@@ -726,17 +689,17 @@ function TradeList({ trades, isLight }: { trades: TradeWithNet[]; isLight: boole
         <li
           key={trade.id}
           className={clsx(
-            "border p-3 md:p-4 transition shadow-sm hover:shadow",
+            "border p-4 transition shadow-sm hover:shadow",
             isLight 
               ? "rounded-lg border-slate-200 bg-white" 
               : "rounded-lg border-slate-700/50 bg-slate-800/50 text-slate-300"
           )}
         >
-          <div className={clsx("flex items-center justify-between text-xs md:text-sm mb-2", isLight ? "text-slate-700" : "text-slate-200")}>
+          <div className={clsx("flex items-center justify-between text-sm mb-2", isLight ? "text-slate-700" : "text-slate-200")}>
             <span className="font-medium">{format(new Date(trade.closeTime), "HH:mm")}</span>
             <span className="font-semibold">{trade.symbol}</span>
           </div>
-          <div className={clsx("mt-2 flex flex-wrap items-center gap-2 md:gap-3 text-[10px] md:text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
+          <div className={clsx("mt-2 flex flex-wrap items-center gap-3 text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
             <span>{trade.type} {trade.volume.toFixed(2)} lots</span>
             <span>Open {trade.openPrice.toFixed(2)}</span>
             <span>Close {trade.closePrice.toFixed(2)}</span>
@@ -745,7 +708,7 @@ function TradeList({ trades, isLight }: { trades: TradeWithNet[]; isLight: boole
           </div>
           <div
             className={clsx(
-              "mt-2 text-base md:text-lg font-semibold",
+              "mt-2 text-lg font-semibold",
               trade.netPnl >= 0 
                 ? (isLight ? "text-emerald-600" : "text-emerald-300") 
                 : (isLight ? "text-rose-600" : "text-rose-300")
@@ -766,20 +729,20 @@ function IdeaList({ ideas, isLight }: { ideas: TradeIdeaSummary[]; isLight: bool
         <li
           key={idea.ideaGroupKey}
           className={clsx(
-            "border p-3 md:p-4 transition shadow-sm hover:shadow",
+            "border p-4 transition shadow-sm hover:shadow",
             isLight 
               ? "rounded-lg border-slate-200 bg-white" 
               : "rounded-lg border-slate-700/50 bg-slate-800/50 text-slate-300"
           )}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
             <div>
               <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>Trade idea</p>
-              <p className={clsx("text-sm md:text-base font-semibold", isLight ? "text-slate-900" : "text-white")}>{idea.symbol} · {idea.type}</p>
+              <p className={clsx("text-base font-semibold", isLight ? "text-slate-900" : "text-white")}>{idea.symbol} · {idea.type}</p>
             </div>
             <div
               className={clsx(
-                "text-base md:text-lg font-semibold",
+                "text-lg font-semibold",
                 idea.netPnl >= 0 
                   ? (isLight ? "text-emerald-600" : "text-emerald-400") 
                   : (isLight ? "text-rose-600" : "text-rose-400")
@@ -788,16 +751,16 @@ function IdeaList({ ideas, isLight }: { ideas: TradeIdeaSummary[]; isLight: bool
               {formatCurrency(idea.netPnl)}
             </div>
           </div>
-          <div className={clsx("mt-2 flex flex-wrap items-center gap-2 md:gap-4 text-[10px] md:text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
+          <div className={clsx("mt-2 flex flex-wrap items-center gap-4 text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
             <span>Volume {idea.totalVolume.toFixed(2)} lots</span>
             <span>Legs {idea.legs.length}</span>
             <span>
               {format(new Date(idea.openTime), "HH:mm")} → {format(new Date(idea.closeTime), "HH:mm")}
             </span>
           </div>
-          <div className={clsx("mt-3 space-y-2 rounded-lg border p-2 md:p-3", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-900/50")}>
+          <div className={clsx("mt-3 space-y-2 rounded-lg border p-3", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-900/50")}>
             {idea.legs.map((leg) => (
-              <div key={leg.id} className={clsx("flex flex-wrap items-center justify-between text-[10px] md:text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
+              <div key={leg.id} className={clsx("flex flex-wrap items-center justify-between text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
                 <span>{format(new Date(leg.closeTime), "HH:mm:ss")}</span>
                 <span>{leg.type} {leg.volume.toFixed(2)} lots</span>
                 <span
@@ -856,8 +819,6 @@ function OptionsMenu({
   onDateModeChange,
   liveUpdates,
   onLiveUpdatesChange,
-  calendarView,
-  onCalendarViewChange,
   onJumpToToday,
   showWeekends,
   onShowWeekendsChange,
@@ -873,8 +834,6 @@ function OptionsMenu({
   onDateModeChange: (mode: DateMode) => void;
   liveUpdates: boolean;
   onLiveUpdatesChange: (enabled: boolean) => void;
-  calendarView: "gallery" | "inline";
-  onCalendarViewChange: (view: "gallery" | "inline") => void;
   onJumpToToday: () => void;
   showWeekends: boolean;
   onShowWeekendsChange: (show: boolean) => void;
@@ -962,31 +921,6 @@ function OptionsMenu({
               className="h-4 w-4 cursor-pointer"
             />
           </label>
-          <div className="space-y-2 pt-2">
-            <p className={clsx("text-xs font-medium", isLight ? "text-slate-600" : "text-slate-400")}>Layout</p>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="calendarView"
-                value="gallery"
-                checked={calendarView === "gallery"}
-                onChange={() => onCalendarViewChange("gallery")}
-                className="h-4 w-4 cursor-pointer"
-              />
-              <span className={clsx("text-sm", isLight ? "text-slate-700" : "text-slate-200")}>🖼️ Gallery (compact)</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="calendarView"
-                value="inline"
-                checked={calendarView === "inline"}
-                onChange={() => onCalendarViewChange("inline")}
-                className="h-4 w-4 cursor-pointer"
-              />
-              <span className={clsx("text-sm", isLight ? "text-slate-700" : "text-slate-200")}>📋 Inline (spacious)</span>
-            </label>
-          </div>
         </div>
       </div>
 
