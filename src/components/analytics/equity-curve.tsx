@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { format } from "date-fns";
 
@@ -166,15 +166,16 @@ export function EquityCurve({ dateRange, theme }: EquityCurveProps) {
     .map((point, idx) => ({ point, idx }))
     .filter(({ idx }) => idx % xAxisInterval === 0 || idx === equityCurve.length - 1);
 
-  const recoveryDays = useMemo(() => {
-    const valley = maxDrawdownIndex;
-    const target = equityCurve[valley].equity + (peakEquity - equityCurve[valley].equity) * 0.5;
-    const recoveryIdx = equityCurve.findIndex((p, idx) => idx > valley && p.equity >= target);
-    if (recoveryIdx < 0) return null;
-    const valleyDate = new Date(equityCurve[valley].date);
-    const recoveryDate = new Date(equityCurve[recoveryIdx].date);
-    return Math.ceil((recoveryDate.getTime() - valleyDate.getTime()) / (1000 * 60 * 60 * 24));
-  }, [equityCurve, maxDrawdownIndex, peakEquity]);
+  const valley = maxDrawdownIndex;
+  const target = equityCurve[valley].equity + (peakEquity - equityCurve[valley].equity) * 0.5;
+  const recoveryIdx = equityCurve.findIndex((p, idx) => idx > valley && p.equity >= target);
+  const recoveryDays =
+    recoveryIdx < 0
+      ? null
+      : Math.ceil(
+          (new Date(equityCurve[recoveryIdx].date).getTime() - new Date(equityCurve[valley].date).getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
 
   const handlePointerMove = (clientX: number) => {
     if (!chartRef.current) return;
