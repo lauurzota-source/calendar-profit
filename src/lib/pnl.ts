@@ -1,6 +1,6 @@
 import { Trade } from "@prisma/client";
 import { formatISO } from "./dates";
-import { AggregationMode, DailyPnl, TradeIdeaSummary, TradeWithNet, DateMode } from "./types";
+import { AggregationMode, DailyPnl, MonthlyPnl, TradeIdeaSummary, TradeWithNet, DateMode } from "./types";
 import { buildIdeaGroupKey } from "./idea-groups";
 
 export function getNetPnl(trade: Trade) {
@@ -35,6 +35,31 @@ export function aggregateDailyPnl(trades: Trade[], mode: AggregationMode, dateMo
     .sort((a, b) => (a.date > b.date ? 1 : -1));
 }
 
+export function aggregateMonthlyPnl(trades: Trade[], mode: AggregationMode, dateMode: DateMode = "open"): MonthlyPnl[] {
+  const map = new Map<string, { pnl: number; trades: number; ideas: Set<string> }>();
+
+  for (const trade of trades) {
+    const dateToUse = dateMode === "open" ? trade.openTime : trade.closeTime;
+    const date = new Date(dateToUse);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const entry = map.get(key) ?? { pnl: 0, trades: 0, ideas: new Set<string>() };
+    const net = getNetPnl(trade);
+    entry.pnl += net;
+    entry.trades += 1;
+    if (mode === "ideas") {
+      entry.ideas.add(resolveIdeaKey(trade));
+    }
+    map.set(key, entry);
+  }
+
+  return Array.from(map.entries())
+    .map(([month, value]) => ({
+      month,
+      monthlyPnl: Number(value.pnl.toFixed(2)),
+      itemCount: mode === "ideas" ? value.ideas.size : value.trades,
+    }))
+    .sort((a, b) => (a.month > b.month ? 1 : -1));
+}
 export function attachNetPnl(trade: Trade): TradeWithNet {
   return { ...trade, netPnl: getNetPnl(trade) };
 }

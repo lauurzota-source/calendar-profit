@@ -535,6 +535,17 @@ export function TradeCalendar() {
                   ? "rounded border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400" 
                   : "rounded border-slate-600/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600"
               )}
+              href="/yearly"
+            >
+              📅 Yearly totals
+            </Link>
+            <Link
+              className={clsx(
+                "px-4 py-2 font-medium transition border",
+                isLight 
+                  ? "rounded border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400" 
+                  : "rounded border-slate-600/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600"
+              )}
               href="/upload"
             >
               Import MT5 report

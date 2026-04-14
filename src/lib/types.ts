@@ -9,6 +9,11 @@ export type DailyPnl = {
   itemCount: number;
 };
 
+export type MonthlyPnl = {
+  month: string; // YYYY-MM
+  monthlyPnl: number;
+  itemCount: number;
+};
 export type TradeWithNet = Trade & { netPnl: number };
 
 export type TradeIdeaSummary = {
