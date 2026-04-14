@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { format } from "date-fns";
 
@@ -16,6 +16,8 @@ interface EquityCurveProps {
   theme: "dark" | "light";
 }
 
+type SeriesPoint = { x: number; y: number };
+
 export function EquityCurve({ dateRange, theme }: EquityCurveProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +27,11 @@ export function EquityCurve({ dateRange, theme }: EquityCurveProps) {
     maxDrawdown: number;
     finalEquity: number;
   } | null>(null);
-  const [hoveredPoint, setHoveredPoint] = useState<{ point: EquityPoint; x: number; y: number } | null>(null);
-  const [showDrawdown, setShowDrawdown] = useState(true);
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [animated, setAnimated] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
   const isLight = theme === "light";
@@ -35,9 +40,16 @@ export function EquityCurve({ dateRange, theme }: EquityCurveProps) {
     : "rounded-lg border border-slate-700/50 bg-slate-900/50 p-6 shadow-sm";
 
   useEffect(() => {
+    setIsTouchDevice(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+      setAnimated(false);
+      setActiveIndex(null);
+      setPinnedIndex(null);
       try {
         const response = await fetch(
           `/api/analytics/equity-curve?from=${dateRange.from}&to=${dateRange.to}`
@@ -55,459 +67,469 @@ export function EquityCurve({ dateRange, theme }: EquityCurveProps) {
     fetchData();
   }, [dateRange]);
 
-  if (!data) return null;
-
-  const { equityCurve, peakEquity, maxDrawdown, finalEquity } = data;
-  
-  // Find key points with tolerance for floating point comparison
-  const minEquityValue = Math.min(...equityCurve.map((pt) => pt.equity));
-  const maxDrawdownIndex = equityCurve.findIndex((p) => Math.abs(p.equity - minEquityValue) < 0.01);
-  
-  // Find peak equity index (with tolerance)
-  const peakEquityIndex = equityCurve.findIndex((p) => Math.abs(p.equity - peakEquity) < 0.01);
-  
-  // If exact match not found, find the index with maximum equity value
-  const actualPeakIndex = equityCurve.reduce((maxIdx, point, idx, arr) => 
-    point.equity > arr[maxIdx].equity ? idx : maxIdx, 0
-  );
-  const finalPeakIndex = peakEquityIndex >= 0 ? peakEquityIndex : actualPeakIndex;
-
-  // Calculate recovery time (time from max drawdown back to 50% recovery)
-  let recoveryTime = null;
-  if (maxDrawdownIndex >= 0) {
-    const lowestEquity = equityCurve[maxDrawdownIndex].equity;
-    const targetRecoveryEquity = lowestEquity + (peakEquity - lowestEquity) * 0.5;
-    const recoveryIndex = equityCurve.findIndex(
-      (p, idx) => idx > maxDrawdownIndex && p.equity >= targetRecoveryEquity
-    );
-    if (recoveryIndex >= 0) {
-      const startDate = new Date(equityCurve[maxDrawdownIndex].date);
-      const recoveryDate = new Date(equityCurve[recoveryIndex].date);
-      recoveryTime = Math.ceil((recoveryDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  useEffect(() => {
+    if (!loading && data?.equityCurve.length) {
+      const id = window.requestAnimationFrame(() => setAnimated(true));
+      return () => window.cancelAnimationFrame(id);
     }
+  }, [loading, data]);
+
+  if (loading) {
+    return (
+      <div className={surfaceClass}>
+        <h2 className={clsx("text-lg font-semibold mb-2", isLight ? "text-slate-900" : "text-white")}>
+          Equity & Drawdown
+        </h2>
+        <p className={clsx("text-sm", isLight ? "text-slate-500" : "text-slate-400")}>Loading chart...</p>
+      </div>
+    );
   }
 
-  // Calculate min/max for proper scaling (don't force 0 as minimum)
-  const minEquity = Math.min(...equityCurve.map((p) => p.equity));
-  const maxEquity = Math.max(...equityCurve.map((p) => p.equity), peakEquity);
-  // Add some padding to the range for better visualization
-  const rangePadding = (maxEquity - minEquity) * 0.05 || 100;
-  const range = (maxEquity - minEquity) + (rangePadding * 2) || 1;
-  const adjustedMinEquity = minEquity - rangePadding;
-
-  const chartHeight = 400;
-  // Calculate chart width: minimum 800px, or 3px per data point, whichever is larger
-  const chartWidth = Math.max(800, equityCurve.length * 3);
-  const padding = { top: 20, right: 40, bottom: 60, left: 80 };
-  const graphWidth = chartWidth - padding.left - padding.right;
-  const graphHeight = chartHeight - padding.top - padding.bottom;
-
-  const getXPosition = (index: number) => {
-    return padding.left + (index / (equityCurve.length - 1 || 1)) * graphWidth;
-  };
-
-  const getYPosition = (value: number) => {
-    return padding.top + graphHeight - ((value - adjustedMinEquity) / range) * graphHeight;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!chartRef.current) return;
-    const rect = chartRef.current.getBoundingClientRect();
-    const scrollLeft = chartRef.current.scrollLeft || 0;
-    const x = e.clientX - rect.left + scrollLeft;
-    
-    // Clamp x to valid range
-    const clampedX = Math.max(padding.left, Math.min(x, chartWidth - padding.right));
-    
-    // Find closest point
-    const normalizedX = (clampedX - padding.left) / graphWidth;
-    const pointIndex = Math.round(normalizedX * (equityCurve.length - 1));
-    const clampedIndex = Math.max(0, Math.min(equityCurve.length - 1, pointIndex));
-    const point = equityCurve[clampedIndex];
-    
-    setHoveredPoint({
-      point,
-      x: getXPosition(clampedIndex),
-      y: getYPosition(point.equity),
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredPoint(null);
-  };
-
-  // Generate Y-axis labels (with adjusted range)
-  const yAxisLabels = 5;
-  const yAxisValues: number[] = [];
-  for (let i = 0; i <= yAxisLabels; i++) {
-    const value = adjustedMinEquity + (range * i) / yAxisLabels;
-    yAxisValues.push(Number(value.toFixed(2)));
-  }
-
-  // Generate X-axis labels (every 10th point or so)
-  const xAxisInterval = Math.max(1, Math.floor(equityCurve.length / 8));
-  const xAxisPoints = equityCurve.filter((_, idx) => idx % xAxisInterval === 0 || idx === equityCurve.length - 1);
-
-  return (
-    <div className={surfaceClass}>
-      <h2 className={clsx("text-lg font-semibold mb-4", isLight ? "text-slate-900" : "text-white")}>
-        Equity Curve & Drawdown
-      </h2>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-        <div className={clsx("p-4 rounded-lg border", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-800/50")}>
-          <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>
-            Final Equity
-          </p>
-          <p className={clsx("text-2xl font-semibold", finalEquity >= 0 ? (isLight ? "text-emerald-600" : "text-emerald-400") : (isLight ? "text-rose-600" : "text-rose-400"))}>
-            ${finalEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        <div className={clsx("p-4 rounded-lg border", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-800/50")}>
-          <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>
-            Peak Equity
-          </p>
-          <p className={clsx("text-2xl font-semibold", isLight ? "text-slate-900" : "text-white")}>
-            ${peakEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        <div className={clsx("p-4 rounded-lg border", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-800/50")}>
-          <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>
-            Max Drawdown
-          </p>
-          <p className={clsx("text-2xl font-semibold", isLight ? "text-rose-600" : "text-rose-400")}>
-            ${maxDrawdown.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className={clsx("text-xs mt-1", isLight ? "text-slate-500" : "text-slate-400")}>
-            {peakEquity > 0 ? ((maxDrawdown / peakEquity) * 100).toFixed(2) : "0.00"}%
-          </p>
-        </div>
-        {recoveryTime !== null && (
-          <div className={clsx("p-4 rounded-lg border", isLight ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-800/50")}>
-            <p className={clsx("text-xs uppercase tracking-wider font-medium mb-1", isLight ? "text-slate-500" : "text-slate-400")}>
-              Recovery Time
-            </p>
-            <p className={clsx("text-2xl font-semibold", isLight ? "text-slate-900" : "text-white")}>
-              {recoveryTime} days
-            </p>
-          </div>
-        )}
-        <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showDrawdown}
-              onChange={(e) => setShowDrawdown(e.target.checked)}
-              className="h-4 w-4 cursor-pointer"
-            />
-            <span className={clsx("text-sm", isLight ? "text-slate-700" : "text-slate-300")}>Show Drawdown</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-0.5 bg-emerald-500" />
-          <span className={clsx("text-xs", isLight ? "text-slate-600" : "text-slate-400")}>Equity Curve</span>
-        </div>
-        {showDrawdown && (
-          <>
-            <div className="flex items-center gap-2">
-              <div className={clsx("w-4 h-8 rounded", isLight ? "bg-rose-500/20" : "bg-rose-500/30")} />
-              <span className={clsx("text-xs", isLight ? "text-slate-600" : "text-slate-400")}>Drawdown Area</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-0.5 border-t-2 border-dashed border-rose-500" />
-              <span className={clsx("text-xs", isLight ? "text-slate-600" : "text-slate-400")}>Drawdown Line</span>
-            </div>
-          </>
-        )}
-        {maxDrawdownIndex >= 0 && (
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-rose-500" />
-            <span className={clsx("text-xs", isLight ? "text-slate-600" : "text-slate-400")}>Max Drawdown</span>
-          </div>
-        )}
-        {peakEquityIndex >= 0 && (
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className={clsx("text-xs", isLight ? "text-slate-600" : "text-slate-400")}>Peak Equity</span>
-          </div>
-        )}
-      </div>
-
-      {loading && (
-        <p className={clsx("text-sm", isLight ? "text-slate-500" : "text-slate-400")}>Loading equity curve...</p>
-      )}
-
-      {error && (
+  if (error) {
+    return (
+      <div className={surfaceClass}>
+        <h2 className={clsx("text-lg font-semibold mb-2", isLight ? "text-slate-900" : "text-white")}>
+          Equity & Drawdown
+        </h2>
         <p className={clsx("text-sm", isLight ? "text-rose-600" : "text-rose-400")}>{error}</p>
-      )}
+      </div>
+    );
+  }
 
-      {!loading && !error && equityCurve.length > 0 && (
-        <div className="relative overflow-x-auto" ref={chartRef}>
-          <div style={{ minWidth: `${chartWidth}px` }}>
-            <svg
-              className="w-full"
-              style={{ height: `${chartHeight}px` }}
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              preserveAspectRatio="none"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
-            >
-              {/* Grid lines (horizontal) */}
-              {yAxisValues.map((value, idx) => {
-                const y = getYPosition(value);
-                return (
-                  <g key={`grid-h-${idx}`}>
-                    <line
-                      x1={padding.left}
-                      y1={y}
-                      x2={chartWidth - padding.right}
-                      y2={y}
-                      stroke={isLight ? "#e2e8f0" : "#475569"}
-                      strokeWidth="1"
-                      strokeDasharray="2 2"
-                    />
-                    {/* Y-axis labels */}
-                    <text
-                      x={padding.left - 10}
-                      y={y + 4}
-                      textAnchor="end"
-                      className={clsx("text-xs", isLight ? "fill-slate-600" : "fill-slate-400")}
-                    >
-                      ${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* X-axis labels */}
-              {xAxisPoints.map((point, idx) => {
-                const pointIndex = equityCurve.findIndex((p) => p.date === point.date);
-                if (pointIndex < 0) return null;
-                const x = getXPosition(pointIndex);
-                return (
-                  <g key={`x-label-${idx}`}>
-                    <line
-                      x1={x}
-                      y1={chartHeight - padding.bottom}
-                      x2={x}
-                      y2={chartHeight - padding.bottom + 5}
-                      stroke={isLight ? "#64748b" : "#94a3b8"}
-                      strokeWidth="1"
-                    />
-                    <text
-                      x={x}
-                      y={chartHeight - padding.bottom + 20}
-                      textAnchor="middle"
-                      className={clsx("text-xs", isLight ? "fill-slate-600" : "fill-slate-400")}
-                      transform={`rotate(-45 ${x} ${chartHeight - padding.bottom + 20})`}
-                    >
-                      {format(new Date(point.date), "MMM d")}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Axis lines */}
-              <line
-                x1={padding.left}
-                y1={padding.top}
-                x2={padding.left}
-                y2={chartHeight - padding.bottom}
-                stroke={isLight ? "#64748b" : "#94a3b8"}
-                strokeWidth="2"
-              />
-              <line
-                x1={padding.left}
-                y1={chartHeight - padding.bottom}
-                x2={chartWidth - padding.right}
-                y2={chartHeight - padding.bottom}
-                stroke={isLight ? "#64748b" : "#94a3b8"}
-                strokeWidth="2"
-              />
-
-              {/* Drawdown area (behind equity curve) */}
-              {showDrawdown && (
-                <polygon
-                  points={`${padding.left},${chartHeight - padding.bottom} ${equityCurve
-                    .map(
-                      (point, index) =>
-                        `${getXPosition(index)},${getYPosition(point.equity - point.drawdown)}`
-                    )
-                    .join(" ")} ${chartWidth - padding.right},${chartHeight - padding.bottom}`}
-                  fill={isLight ? "rgba(239, 68, 68, 0.1)" : "rgba(239, 68, 68, 0.2)"}
-                />
-              )}
-
-              {/* Drawdown line */}
-              {showDrawdown && (
-                <polyline
-                  points={equityCurve
-                    .map(
-                      (point, index) =>
-                        `${getXPosition(index)},${getYPosition(point.equity - point.drawdown)}`
-                    )
-                    .join(" ")}
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                  strokeDasharray="4 4"
-                />
-              )}
-
-              {/* Equity curve */}
-              <polyline
-                points={equityCurve
-                  .map(
-                    (point, index) =>
-                      `${getXPosition(index)},${getYPosition(point.equity)}`
-                  )
-                  .join(" ")}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Interactive points (invisible but clickable) */}
-              {equityCurve.map((point, index) => (
-                <circle
-                  key={`point-${index}`}
-                  cx={getXPosition(index)}
-                  cy={getYPosition(point.equity)}
-                  r="4"
-                  fill="transparent"
-                  className="cursor-crosshair"
-                />
-              ))}
-
-              {/* Peak Equity Marker */}
-              {finalPeakIndex >= 0 && (
-                <g>
-                  <circle
-                    cx={getXPosition(finalPeakIndex)}
-                    cy={getYPosition(equityCurve[finalPeakIndex].equity)}
-                    r="6"
-                    fill="#10b981"
-                    stroke={isLight ? "#ffffff" : "#1e293b"}
-                    strokeWidth="2"
-                  />
-                  <text
-                    x={getXPosition(finalPeakIndex)}
-                    y={getYPosition(equityCurve[finalPeakIndex].equity) - 15}
-                    textAnchor="middle"
-                    className={clsx("text-xs font-semibold", isLight ? "fill-slate-900" : "fill-emerald-300")}
-                  >
-                    Peak
-                  </text>
-                </g>
-              )}
-
-              {/* Max Drawdown Marker */}
-              {maxDrawdownIndex >= 0 && (
-                <g>
-                  <circle
-                    cx={getXPosition(maxDrawdownIndex)}
-                    cy={getYPosition(equityCurve[maxDrawdownIndex].equity)}
-                    r="6"
-                    fill="#ef4444"
-                    stroke={isLight ? "#ffffff" : "#1e293b"}
-                    strokeWidth="2"
-                  />
-                  <text
-                    x={getXPosition(maxDrawdownIndex)}
-                    y={getYPosition(equityCurve[maxDrawdownIndex].equity) + 25}
-                    textAnchor="middle"
-                    className={clsx("text-xs font-semibold", isLight ? "fill-slate-900" : "fill-rose-300")}
-                  >
-                    Max DD
-                  </text>
-                </g>
-              )}
-
-              {/* Tooltip */}
-              {hoveredPoint && (
-                <g>
-                  {/* Vertical line */}
-                  <line
-                    x1={hoveredPoint.x}
-                    y1={padding.top}
-                    x2={hoveredPoint.x}
-                    y2={chartHeight - padding.bottom}
-                    stroke={isLight ? "#94a3b8" : "#64748b"}
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Tooltip point */}
-                  <circle
-                    cx={hoveredPoint.x}
-                    cy={hoveredPoint.y}
-                    r="5"
-                    fill="#10b981"
-                    stroke={isLight ? "#ffffff" : "#1e293b"}
-                    strokeWidth="2"
-                  />
-                  {/* Tooltip box */}
-                  <rect
-                    x={hoveredPoint.x + 10}
-                    y={hoveredPoint.y - 50}
-                    width="180"
-                    height="80"
-                    fill={isLight ? "rgba(255, 255, 255, 0.95)" : "rgba(15, 23, 42, 0.95)"}
-                    stroke={isLight ? "#cbd5e1" : "#475569"}
-                    strokeWidth="1"
-                    rx="4"
-                    className="backdrop-blur-sm"
-                  />
-                  {/* Tooltip text */}
-                  <text
-                    x={hoveredPoint.x + 20}
-                    y={hoveredPoint.y - 30}
-                    className={clsx("text-xs font-semibold", isLight ? "fill-slate-900" : "fill-white")}
-                  >
-                    {format(new Date(hoveredPoint.point.date), "MMM d, yyyy")}
-                  </text>
-                  <text
-                    x={hoveredPoint.x + 20}
-                    y={hoveredPoint.y - 15}
-                    className={clsx("text-xs", isLight ? "fill-slate-700" : "fill-slate-300")}
-                  >
-                    Equity: ${hoveredPoint.point.equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </text>
-                  <text
-                    x={hoveredPoint.x + 20}
-                    y={hoveredPoint.y}
-                    className={clsx("text-xs", isLight ? "fill-slate-700" : "fill-slate-300")}
-                  >
-                    P&L: {hoveredPoint.point.netPnl >= 0 ? "+" : ""}
-                    ${hoveredPoint.point.netPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </text>
-                  {showDrawdown && (
-                    <text
-                      x={hoveredPoint.x + 20}
-                      y={hoveredPoint.y + 15}
-                      className={clsx("text-xs", isLight ? "fill-rose-600" : "fill-rose-400")}
-                    >
-                      DD: ${hoveredPoint.point.drawdown.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </text>
-                  )}
-                </g>
-              )}
-            </svg>
-          </div>
-        </div>
-      )}
-
-      {!loading && !error && equityCurve.length === 0 && (
+  if (!data || data.equityCurve.length === 0) {
+    return (
+      <div className={surfaceClass}>
+        <h2 className={clsx("text-lg font-semibold mb-2", isLight ? "text-slate-900" : "text-white")}>
+          Equity & Drawdown
+        </h2>
         <p className={clsx("text-sm text-center py-8", isLight ? "text-slate-500" : "text-slate-400")}>
           No data available for the selected date range.
         </p>
-      )}
+      </div>
+    );
+  }
+
+  const { equityCurve, peakEquity, maxDrawdown, finalEquity } = data;
+  const selectedIndex = pinnedIndex ?? activeIndex;
+  const selectedPoint = selectedIndex !== null ? equityCurve[selectedIndex] : null;
+
+  const peakIndex = equityCurve.reduce(
+    (maxIdx, point, idx, arr) => (point.equity > arr[maxIdx].equity ? idx : maxIdx),
+    0
+  );
+  const maxDrawdownIndex = equityCurve.reduce(
+    (maxIdx, point, idx, arr) => (point.drawdown > arr[maxIdx].drawdown ? idx : maxIdx),
+    0
+  );
+
+  const minEquity = Math.min(...equityCurve.map((pt) => pt.equity));
+  const maxEquity = Math.max(...equityCurve.map((pt) => pt.equity));
+  const equityPadding = (maxEquity - minEquity) * 0.08 || 100;
+  const equityMin = minEquity - equityPadding;
+  const equityMax = maxEquity + equityPadding;
+  const equityRange = equityMax - equityMin || 1;
+
+  const maxDD = Math.max(...equityCurve.map((pt) => pt.drawdown), 1);
+  const ddRange = maxDD * 1.1;
+
+  const chartHeight = 470;
+  const chartWidth = Math.max(820, equityCurve.length * 2.4);
+  const padding = { top: 24, right: 28, bottom: 52, left: 86 };
+  const paneGap = 28;
+  const equityPaneHeight = 260;
+  const drawdownPaneHeight = 106;
+  const graphWidth = chartWidth - padding.left - padding.right;
+  const equityPaneBottom = padding.top + equityPaneHeight;
+  const drawdownPaneTop = equityPaneBottom + paneGap;
+  const drawdownPaneBottom = drawdownPaneTop + drawdownPaneHeight;
+
+  const getX = (index: number) => padding.left + (index / (equityCurve.length - 1 || 1)) * graphWidth;
+  const getEquityY = (value: number) => padding.top + equityPaneHeight - ((value - equityMin) / equityRange) * equityPaneHeight;
+  const getDrawdownY = (value: number) =>
+    drawdownPaneTop + ((ddRange - value) / ddRange) * drawdownPaneHeight;
+
+  const equityPoints: SeriesPoint[] = equityCurve.map((point, idx) => ({
+    x: getX(idx),
+    y: getEquityY(point.equity),
+  }));
+
+  const equitySmoothPath = buildSmoothPath(equityPoints);
+  const equityAreaPath = [
+    `M ${equityPoints[0].x} ${equityPaneBottom}`,
+    ...equityPoints.map((p) => `L ${p.x} ${p.y}`),
+    `L ${equityPoints[equityPoints.length - 1].x} ${equityPaneBottom}`,
+    "Z",
+  ].join(" ");
+
+  const xAxisInterval = Math.max(1, Math.floor(equityCurve.length / 7));
+  const xAxisPoints = equityCurve
+    .map((point, idx) => ({ point, idx }))
+    .filter(({ idx }) => idx % xAxisInterval === 0 || idx === equityCurve.length - 1);
+
+  const recoveryDays = useMemo(() => {
+    const valley = maxDrawdownIndex;
+    const target = equityCurve[valley].equity + (peakEquity - equityCurve[valley].equity) * 0.5;
+    const recoveryIdx = equityCurve.findIndex((p, idx) => idx > valley && p.equity >= target);
+    if (recoveryIdx < 0) return null;
+    const valleyDate = new Date(equityCurve[valley].date);
+    const recoveryDate = new Date(equityCurve[recoveryIdx].date);
+    return Math.ceil((recoveryDate.getTime() - valleyDate.getTime()) / (1000 * 60 * 60 * 24));
+  }, [equityCurve, maxDrawdownIndex, peakEquity]);
+
+  const handlePointerMove = (clientX: number) => {
+    if (!chartRef.current) return;
+    const rect = chartRef.current.getBoundingClientRect();
+    const scrollLeft = chartRef.current.scrollLeft;
+    const x = clientX - rect.left + scrollLeft;
+    const normalizedX = (x - padding.left) / graphWidth;
+    const idx = Math.max(0, Math.min(equityCurve.length - 1, Math.round(normalizedX * (equityCurve.length - 1))));
+    setActiveIndex(idx);
+  };
+
+  const tooltipX = selectedIndex !== null ? getX(selectedIndex) : 0;
+  const tooltipLeft = Math.max(
+    padding.left + 6,
+    Math.min(tooltipX + 12, chartWidth - padding.right - 204)
+  );
+  const tooltipTop = selectedIndex !== null
+    ? Math.max(8, getEquityY(equityCurve[selectedIndex].equity) - 94)
+    : 0;
+
+  return (
+    <div className={surfaceClass}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className={clsx("text-lg font-semibold", isLight ? "text-slate-900" : "text-white")}>
+            Equity & Drawdown
+          </h2>
+          <p className={clsx("mt-1 text-xs", isLight ? "text-slate-500" : "text-slate-400")}>
+            Smoothed equity trend with risk pane for faster drawdown reading.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowMarkers((prev) => !prev)}
+          className={clsx(
+            "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+            showMarkers
+              ? isLight
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+              : isLight
+              ? "border-slate-300 bg-white text-slate-600"
+              : "border-slate-600/70 bg-slate-800/50 text-slate-300"
+          )}
+        >
+          Markers
+        </button>
+      </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        <MetricCard
+          label="Final Equity"
+          value={money(finalEquity)}
+          tone={finalEquity >= 0 ? "up" : "down"}
+          light={isLight}
+        />
+        <MetricCard label="Peak Equity" value={money(peakEquity)} tone="neutral" light={isLight} />
+        <MetricCard
+          label="Max Drawdown"
+          value={money(maxDrawdown)}
+          subValue={`${peakEquity > 0 ? ((maxDrawdown / peakEquity) * 100).toFixed(2) : "0.00"}%`}
+          tone="down"
+          light={isLight}
+        />
+        {recoveryDays !== null && (
+          <MetricCard label="Recovery" value={`${recoveryDays} days`} tone="neutral" light={isLight} />
+        )}
+        <MetricCard label="Trades" value={`${equityCurve.length}`} tone="neutral" light={isLight} />
+      </div>
+
+      <div
+        className="relative overflow-x-auto"
+        ref={chartRef}
+        onMouseMove={(e) => {
+          if (isTouchDevice || pinnedIndex !== null) return;
+          handlePointerMove(e.clientX);
+        }}
+        onMouseLeave={() => {
+          if (pinnedIndex === null) setActiveIndex(null);
+        }}
+        onClick={(e) => {
+          if (!isTouchDevice) return;
+          handlePointerMove(e.clientX);
+          const next = activeIndex;
+          setPinnedIndex((prev) => (prev === next ? null : next));
+        }}
+      >
+        <div className="relative" style={{ minWidth: `${chartWidth}px` }}>
+          <svg
+            className="w-full"
+            style={{ height: `${chartHeight}px` }}
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              <linearGradient id="eq-area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={isLight ? "#10b981" : "#34d399"} stopOpacity="0.28" />
+                <stop offset="100%" stopColor={isLight ? "#10b981" : "#34d399"} stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+
+            {[0, 1, 2, 3, 4].map((i) => {
+              const value = equityMin + (equityRange * i) / 4;
+              const y = getEquityY(value);
+              return (
+                <g key={`eq-grid-${i}`}>
+                  <line
+                    x1={padding.left}
+                    y1={y}
+                    x2={chartWidth - padding.right}
+                    y2={y}
+                    stroke={isLight ? "#e2e8f0" : "#334155"}
+                    strokeDasharray="3 3"
+                  />
+                  <text
+                    x={padding.left - 10}
+                    y={y + 4}
+                    textAnchor="end"
+                    className={clsx("text-xs", isLight ? "fill-slate-500" : "fill-slate-400")}
+                  >
+                    {moneyShort(value)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {[0, 1, 2, 3].map((i) => {
+              const value = (ddRange * i) / 3;
+              const y = getDrawdownY(value);
+              return (
+                <g key={`dd-grid-${i}`}>
+                  <line
+                    x1={padding.left}
+                    y1={y}
+                    x2={chartWidth - padding.right}
+                    y2={y}
+                    stroke={isLight ? "#fee2e2" : "#3f1f26"}
+                    strokeDasharray="2 4"
+                  />
+                  <text
+                    x={padding.left - 10}
+                    y={y + 4}
+                    textAnchor="end"
+                    className={clsx("text-xs", isLight ? "fill-rose-500" : "fill-rose-400")}
+                  >
+                    {moneyShort(value)}
+                  </text>
+                </g>
+              );
+            })}
+
+            <line
+              x1={padding.left}
+              y1={padding.top}
+              x2={padding.left}
+              y2={drawdownPaneBottom}
+              stroke={isLight ? "#64748b" : "#94a3b8"}
+              strokeWidth="1.5"
+            />
+            <line
+              x1={padding.left}
+              y1={drawdownPaneBottom}
+              x2={chartWidth - padding.right}
+              y2={drawdownPaneBottom}
+              stroke={isLight ? "#64748b" : "#94a3b8"}
+              strokeWidth="1.5"
+            />
+
+            <path d={equityAreaPath} fill="url(#eq-area)" style={{ opacity: animated ? 1 : 0, transition: "opacity 400ms ease" }} />
+            <path
+              d={equitySmoothPath}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="3"
+              strokeLinecap="round"
+              style={{
+                strokeDasharray: 2200,
+                strokeDashoffset: animated ? 0 : 2200,
+                transition: "stroke-dashoffset 900ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            />
+
+            {equityCurve.map((point, idx) => {
+              const x = getX(idx);
+              const barTop = getDrawdownY(point.drawdown);
+              const barHeight = drawdownPaneBottom - barTop;
+              const width = Math.max(2, graphWidth / equityCurve.length - 1);
+              return (
+                <rect
+                  key={`dd-bar-${idx}`}
+                  x={x - width / 2}
+                  y={barTop}
+                  width={width}
+                  height={barHeight}
+                  fill={idx === maxDrawdownIndex ? "#ef4444" : isLight ? "rgba(239,68,68,0.45)" : "rgba(239,68,68,0.6)"}
+                  rx="1"
+                />
+              );
+            })}
+
+            {xAxisPoints.map(({ point, idx }) => {
+              const x = getX(idx);
+              return (
+                <g key={`x-tick-${idx}`}>
+                  <line
+                    x1={x}
+                    y1={drawdownPaneBottom}
+                    x2={x}
+                    y2={drawdownPaneBottom + 4}
+                    stroke={isLight ? "#94a3b8" : "#64748b"}
+                  />
+                  <text
+                    x={x}
+                    y={drawdownPaneBottom + 18}
+                    textAnchor="middle"
+                    className={clsx("text-xs", isLight ? "fill-slate-500" : "fill-slate-400")}
+                  >
+                    {format(new Date(point.date), "MMM d")}
+                  </text>
+                </g>
+              );
+            })}
+
+            {showMarkers && (
+              <>
+                <circle cx={getX(peakIndex)} cy={getEquityY(equityCurve[peakIndex].equity)} r="5.5" fill="#10b981" />
+                <text
+                  x={getX(peakIndex)}
+                  y={getEquityY(equityCurve[peakIndex].equity) - 10}
+                  textAnchor="middle"
+                  className={clsx("text-xs font-semibold", isLight ? "fill-slate-900" : "fill-emerald-300")}
+                >
+                  Peak
+                </text>
+                <circle cx={getX(maxDrawdownIndex)} cy={getEquityY(equityCurve[maxDrawdownIndex].equity)} r="5.5" fill="#ef4444" />
+                <text
+                  x={getX(maxDrawdownIndex)}
+                  y={getEquityY(equityCurve[maxDrawdownIndex].equity) + 18}
+                  textAnchor="middle"
+                  className={clsx("text-xs font-semibold", isLight ? "fill-slate-900" : "fill-rose-300")}
+                >
+                  Max DD
+                </text>
+              </>
+            )}
+
+            {selectedIndex !== null && (
+              <line
+                x1={getX(selectedIndex)}
+                y1={padding.top}
+                x2={getX(selectedIndex)}
+                y2={drawdownPaneBottom}
+                stroke={isLight ? "#94a3b8" : "#64748b"}
+                strokeDasharray="3 4"
+              />
+            )}
+          </svg>
+
+          {selectedPoint && (
+            <div
+              className={clsx(
+                "pointer-events-none absolute z-20 w-[196px] rounded-lg border p-3 shadow-lg backdrop-blur-sm",
+                isLight
+                  ? "border-slate-200 bg-white/95 text-slate-800"
+                  : "border-slate-700 bg-slate-900/90 text-slate-100"
+              )}
+              style={{ left: `${tooltipLeft}px`, top: `${tooltipTop}px` }}
+            >
+              <p className={clsx("text-xs font-semibold", isLight ? "text-slate-700" : "text-slate-100")}>
+                {format(new Date(selectedPoint.date), "MMM d, yyyy")}
+              </p>
+              <p className="mt-1 text-xs">Equity: {money(selectedPoint.equity)}</p>
+              <p className="text-xs">
+                P&L:{" "}
+                <span className={selectedPoint.netPnl >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                  {selectedPoint.netPnl >= 0 ? "+" : ""}
+                  {money(selectedPoint.netPnl)}
+                </span>
+              </p>
+              <p className="text-xs text-rose-500">Drawdown: {money(selectedPoint.drawdown)}</p>
+              {isTouchDevice && (
+                <p className={clsx("mt-1 text-[10px]", isLight ? "text-slate-500" : "text-slate-400")}>
+                  Tap chart again to clear
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildSmoothPath(points: SeriesPoint[]): string {
+  if (points.length < 2) return "";
+  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+
+  const path: string[] = [`M ${points[0].x} ${points[0].y}`];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    path.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`);
+  }
+  return path.join(" ");
+}
+
+function money(value: number): string {
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function moneyShort(value: number): string {
+  return `$${Math.round(value).toLocaleString("en-US")}`;
+}
+
+function MetricCard({
+  label,
+  value,
+  subValue,
+  tone,
+  light,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  tone: "up" | "down" | "neutral";
+  light: boolean;
+}) {
+  const toneClass =
+    tone === "up"
+      ? light
+        ? "text-emerald-600"
+        : "text-emerald-400"
+      : tone === "down"
+      ? light
+        ? "text-rose-600"
+        : "text-rose-400"
+      : light
+      ? "text-slate-900"
+      : "text-white";
+
+  return (
+    <div className={clsx("rounded-lg border p-3", light ? "border-slate-200 bg-slate-50" : "border-slate-700/50 bg-slate-800/50")}>
+      <p className={clsx("text-[10px] uppercase tracking-wider font-medium", light ? "text-slate-500" : "text-slate-400")}>
+        {label}
+      </p>
+      <p className={clsx("mt-1 text-lg font-semibold", toneClass)}>{value}</p>
+      {subValue && <p className={clsx("text-xs", light ? "text-slate-500" : "text-slate-400")}>{subValue}</p>}
     </div>
   );
 }
